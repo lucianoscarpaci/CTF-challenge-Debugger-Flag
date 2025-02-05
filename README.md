@@ -10,11 +10,11 @@ interact with a MAX78000fhtr board.
 Using a nix-shell start an openocd connection to get the debugger running:
 ```bash
 nix-shell
- sudo openocd -s scripts/ -f interface/cmsis-dap.cfg -f target/max78000.cfg -c "bindto 0.0.0.0; init"
+openocd -s scripts/ -f interface/cmsis-dap.cfg -f target/max78000.cfg -c "bindto 0.0.0.0; init"
 ```
 Now use docker to start the debugger in the decoder/ directory of the project and connect to the openocd server:
 ```bash
-sudo docker run --rm -it -p 3333:3333/tcp -v $(pwd)/./build_out:/out --workdir=/root --entrypoint /bin/bash decoder -c " cp -r /out/* /root/ && gdb-multiarch gdb_challenge_25.elf "
+docker run --rm -it -p 3333:3333/tcp -v $(pwd)/./build_out:/out --workdir=/root --entrypoint /bin/bash decoder -c " cp -r /out/* /root/ && gdb-multiarch gdb_challenge_25.elf "
 ```
 
 ## 2. Getting Your Bearings
@@ -310,9 +310,9 @@ first argument is set to `value1`, the third argument is set to `value2`, and
 the fifth argument is set to `value3`.
 
 ```
-(gdb) set $r0 = 0x1000e738
+(gdb) set $r0 = 0x4c09b410 
 (gdb) set $r2 = 0x2001ffe0
-(gdb) set *(int *)($sp) = 0xe13f7732
+(gdb) set *0x2001ffe0 = 0xe13f7732
 (gdb) info registers
 r0             0x1000e738          268494648
 r1             0x22222222          572662306
@@ -339,7 +339,7 @@ basepri        0x0                 0
 faultmask      0x0                 0
 control        0x0                 0
 (gdb) x *0x2001ffe0
-0xe13f7732:     Cannot access memory at address 0xe13f7732
+0xe13f7732:  0xe13f7732
 ```
 We have successfully set the arguments for the function. Now, continue the
 program to see the flag:
@@ -347,8 +347,16 @@ program to see the flag:
 (gdb) c
 ```
 
-Now we know that the registers cannot be modified, but we can modify the 
-binary ELF file to change the instructions at the address of the function.
+Using the screen command set the device and baud rate so we can capture the flag.
+```bash
+screen /dev/tty.usbmodem14202 115200
+``` 
+
+The flag is:
+```
+ectf{debugger_c8bbc4e9dfbb74d5}
+```
+
 
 ## 7. Patching the Binary with Hopper Disassembler
 Open the ELF file in Hopper Disassembler and navigate to the `check_flag`
@@ -358,15 +366,21 @@ function. You will see the instructions that are being executed
 ```
 This is a flag meant to trick you. The real flag is in the `check_flag` function.
 
-At the address 1000e578
+At the address 1000e4e4
 ```assembly
-movs r2, #0x21
-ldr r1, =aTheFirstArgument
-movs r0, #0x47
+ldr        r0, =0x4c09b410
 ```
-This is the address of the instruction that loads the first argument into
-memory. There is no change to this because we are not changing the first
-argument.
+This is the address of the instruction that loads the flag into
+memory.
+
+At the .text ; argument #1 for method transform, dword_1000e5bc
+There is an assembly code that loads the flag into memory. We can change the
+value of the flag by changing the instruction at 0x1000e5bc.
+
+```assembly
+dword_1000e5bc:
+1000e5bc         dd         0x4c09b410
+```
 
 At the .text CODE_XREF=check_flag+198 you will see the following address:
 1000e582

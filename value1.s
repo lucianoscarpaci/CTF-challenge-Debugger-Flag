@@ -1,3 +1,2 @@
-movs r2, #0x21
-ldr r1, =aTheFirstArgument
-movs r0, #0x47
+dword_1000e5bc:
+1000e5bc         dd         0x4c09b410
